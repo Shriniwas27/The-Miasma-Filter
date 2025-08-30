@@ -2,7 +2,7 @@
 
 import { notFound, useParams } from 'next/navigation';
 import * as React from 'react';
-import { streams } from '@/lib/data';
+import { streams, liveStreamStore } from '@/lib/data';
 import { VideoPlayer } from '@/components/video-player';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -13,9 +13,8 @@ export default function StreamPage() {
   const params = useParams();
   const id = params.id as string;
   const [stream, setStream] = React.useState(streams.find((s) => s.id === id));
-  
-  // The stream data might not be immediately available if it was just created.
-  // We'll poll for it briefly. This is a temporary solution for the prototype.
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+
   React.useEffect(() => {
     if (!stream) {
       const interval = setInterval(() => {
@@ -29,11 +28,9 @@ export default function StreamPage() {
       const timeout = setTimeout(() => {
         clearInterval(interval);
         if (!streams.find((s) => s.id === id)) {
-            // If the stream is still not found after a few seconds, show not found.
-            // This is a fallback to prevent infinite loading.
             notFound();
         }
-      }, 5000); // Stop polling after 5 seconds
+      }, 5000);
 
       return () => {
         clearInterval(interval)
@@ -41,10 +38,17 @@ export default function StreamPage() {
       };
     }
   }, [id, stream]);
+  
+  React.useEffect(() => {
+      // In our simulation, we get the live stream from the store.
+      // In a real app, this would connect to a media server.
+    if (videoRef.current && stream?.isLive && liveStreamStore.stream) {
+        videoRef.current.srcObject = liveStreamStore.stream;
+    }
+  }, [stream, videoRef]);
 
 
   if (!stream) {
-    // We can show a loading state while we wait for the stream data
     return (
       <div className="flex justify-center items-center h-full">
         <p>Loading stream...</p>
@@ -56,7 +60,7 @@ export default function StreamPage() {
     <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-6rem)]">
       <div className="flex-1 flex flex-col gap-4">
         <div className="flex-shrink-0">
-          <VideoPlayer isLive={stream.isLive} />
+          <VideoPlayer ref={videoRef} isLive={stream.isLive} />
         </div>
         <div className="p-4 bg-card rounded-lg flex-1 flex flex-col">
           <div className="flex items-start justify-between gap-4 mb-4">

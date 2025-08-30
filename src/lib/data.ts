@@ -109,3 +109,9 @@ export const streams: Stream[] = [
     description: 'Learn to cook a 3-course gourmet meal with Chef Leo, right from your kitchen. Tonight\'s menu features classic Italian dishes with a modern twist.'
   },
 ];
+
+// This is a simple in-memory store for the live stream media stream.
+// In a real application, you would use a proper media server (e.g., using WebRTC).
+export const liveStreamStore: { stream: MediaStream | null } = {
+    stream: null,
+};

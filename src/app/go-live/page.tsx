@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { VideoPlayer } from '@/components/video-player';
-import { streams } from '@/lib/data';
+import { streams, liveStreamStore } from '@/lib/data';
 import { Clapperboard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -44,6 +44,10 @@ export default function GoLivePage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
+      
+      // Store the stream in our "live store" to be picked up by the stream page
+      liveStreamStore.stream = stream;
+
       setIsStreaming(true);
 
       const newStream = await createStreamAction({ title, description, category });
@@ -51,7 +55,6 @@ export default function GoLivePage() {
         title: 'You are live!',
         description: 'Your stream has started and is now visible to others.',
       });
-      // We could redirect to the new stream page, but for now let's stay here
       router.push(`/stream/${newStream.id}`);
 
     } catch (error) {
@@ -117,7 +120,7 @@ export default function GoLivePage() {
 
         <div className="space-y-4">
             <h2 className="text-xl font-semibold">Stream Preview</h2>
-            <VideoPlayer ref={videoRef} isLive={isStreaming} />
+            <VideoPlayer ref={videoRef} isLive={true} isPreview={true} />
             {hasCameraPermission === false && (
               <Alert variant="destructive">
                 <AlertTitle>Camera Access Required</AlertTitle>
