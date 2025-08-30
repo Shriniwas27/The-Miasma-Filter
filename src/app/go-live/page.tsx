@@ -9,11 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { VideoPlayer } from '@/components/video-player';
 import { streams, liveStreamStore } from '@/lib/data';
-import { Clapperboard } from 'lucide-react';
+import { Clapperboard, Copy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createStreamAction } from '@/app/actions';
-import { useRouter } from 'next/navigation';
 
 export default function GoLivePage() {
   const categories = [...new Set(streams.map((s) => s.category))];
@@ -21,12 +20,20 @@ export default function GoLivePage() {
   const [description, setDescription] = React.useState('');
   const [category, setCategory] = React.useState('');
   const [isStreaming, setIsStreaming] = React.useState(false);
+  const [streamUrl, setStreamUrl] = React.useState('');
   const [hasCameraPermission, setHasCameraPermission] = React.useState<boolean | undefined>(undefined);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const rtcConnectionRef = React.useRef<RTCPeerConnection | null>(null);
 
   const { toast } = useToast();
-  const router = useRouter();
+
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(streamUrl);
+    toast({
+      title: 'Copied!',
+      description: 'Stream URL copied to clipboard.',
+    });
+  };
 
   const handleStartStreaming = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -47,7 +54,6 @@ export default function GoLivePage() {
         videoRef.current.srcObject = stream;
       }
       
-      // --- Start WebRTC Setup (Streamer side) ---
       const peerConnection = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
       });
@@ -57,35 +63,33 @@ export default function GoLivePage() {
 
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-          // In a real app, send this candidate to the viewer via signaling server
           liveStreamStore.streamerIceCandidates.push(event.candidate);
         }
       };
       
       peerConnection.onconnectionstatechange = () => {
-        if (peerConnection.connectionState === 'connected') {
+        const state = peerConnection.connectionState;
+        if (state === 'connected') {
             setIsStreaming(true);
         }
-        if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
+        if (state === 'failed' || state === 'disconnected' || state === 'closed') {
             setIsStreaming(false);
         }
       }
 
       const offer = await peerConnection.createOffer();
       await peerConnection.setLocalDescription(offer);
-
-      // In a real app, send this offer to the viewer via signaling server
       liveStreamStore.offer = offer;
 
       const newStream = await createStreamAction({ title, description, category });
+      const newUrl = `${window.location.origin}/stream/${newStream.id}`;
+      setStreamUrl(newUrl);
 
-      // Poll for the answer from the viewer (simulation)
       const interval = setInterval(async () => {
         if (liveStreamStore.answer && peerConnection.signalingState !== 'closed' && peerConnection.currentRemoteDescription === null) {
           await peerConnection.setRemoteDescription(new RTCSessionDescription(liveStreamStore.answer));
           clearInterval(interval);
           
-          // Add viewer ICE candidates
           liveStreamStore.viewerIceCandidates.forEach(candidate => {
             if (peerConnection.signalingState !== 'closed') {
               peerConnection.addIceCandidate(candidate);
@@ -96,9 +100,9 @@ export default function GoLivePage() {
 
       toast({
         title: 'You are live!',
-        description: 'Your stream has started and is now visible to others.',
+        description: 'Your stream has started. Share the link with your viewers!',
       });
-      router.push(`/stream/${newStream.id}`);
+      setIsStreaming(true);
 
     } catch (error) {
       console.error('Error starting stream:', error);
@@ -171,6 +175,24 @@ export default function GoLivePage() {
                   Please allow camera and audio access to start streaming.
                 </AlertDescription>
               </Alert>
+            )}
+            {streamUrl && (
+              <Card>
+                  <CardHeader>
+                      <CardTitle>Share Your Stream</CardTitle>
+                      <CardDescription>
+                          Your stream is live! Share this link with your viewers.
+                      </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                      <div className="flex items-center space-x-2">
+                          <Input value={streamUrl} readOnly />
+                          <Button variant="outline" size="icon" onClick={handleCopyUrl}>
+                              <Copy className="h-4 w-4" />
+                          </Button>
+                      </div>
+                  </CardContent>
+              </Card>
             )}
         </div>
       </div>
