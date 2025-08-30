@@ -20,15 +20,26 @@ export const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
       const checkStream = () => {
         if (videoElement.srcObject) {
           setHasStream(true);
+        } else {
+          setHasStream(false);
         }
       };
+      
+      const onLoadedData = () => {
+        videoElement.play().catch(e => console.error("Autoplay failed", e));
+      }
 
       // Check initially and also when the srcObject changes
       checkStream();
       const observer = new MutationObserver(checkStream);
-      observer.observe(videoElement, { attributes: true, attributeFilter: ['srcObject'] });
+      observer.observe(videoElement, { attributes: true, attributeFilter: ['srcobject'] });
+      
+      videoElement.addEventListener('loadeddata', onLoadedData)
 
-      return () => observer.disconnect();
+      return () => {
+        observer.disconnect();
+        videoElement.removeEventListener('loadeddata', onLoadedData);
+      }
     }
   }, [videoRef]);
 
@@ -38,7 +49,7 @@ export const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
     <div className={cn("w-full aspect-video bg-black rounded-xl border-2 relative flex items-center justify-center", 
         isLive ? "border-primary" : "border-primary/50"
     )}>
-      <video ref={videoRef} className="w-full h-full object-cover rounded-md" autoPlay muted playsInline />
+      <video ref={videoRef} className="w-full h-full object-cover rounded-md" autoPlay muted={isPreview} playsInline />
       
       {showPlaceholder && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-muted-foreground bg-black/80">

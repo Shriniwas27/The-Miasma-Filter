@@ -107,6 +107,10 @@ export default function GoLivePage() {
         const state = peerConnection.connectionState;
         if (state === 'connected') {
             setIsStreaming(true);
+             toast({
+              title: 'You are live!',
+              description: 'Your stream has started. Share the link with your viewers!',
+            });
         }
         if (state === 'failed' || state === 'disconnected' || state === 'closed') {
             setIsStreaming(false);
@@ -123,23 +127,17 @@ export default function GoLivePage() {
 
       // This interval is a stand-in for a real signaling server
       const interval = setInterval(async () => {
-        if (liveStreamStore.answer && peerConnection.signalingState !== 'closed' && peerConnection.currentRemoteDescription === null) {
+        if (liveStreamStore.answer && peerConnection.signalingState === 'have-local-offer') {
           await peerConnection.setRemoteDescription(new RTCSessionDescription(liveStreamStore.answer));
           clearInterval(interval);
           
           liveStreamStore.viewerIceCandidates.forEach(candidate => {
             if (peerConnection.signalingState !== 'closed') {
-              peerConnection.addIceCandidate(candidate);
+              peerConnection.addIceCandidate(candidate).catch(e => console.error("Error adding viewer ICE candidate: ", e));
             }
           });
         }
       }, 500);
-
-      toast({
-        title: 'You are live!',
-        description: 'Your stream has started. Share the link with your viewers!',
-      });
-      setIsStreaming(true);
 
     } catch (error) {
       console.error('Error starting stream:', error);

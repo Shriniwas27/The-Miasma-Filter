@@ -16,6 +16,7 @@ export default function StreamPage() {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const rtcConnectionRef = React.useRef<RTCPeerConnection | null>(null);
   const [isMounted, setIsMounted] = React.useState(false);
+  const [isLive, setIsLive] = React.useState(false);
 
   React.useEffect(() => {
     setIsMounted(true);
@@ -29,6 +30,7 @@ export default function StreamPage() {
     const initialStream = streams.find((s) => s.id === id);
     if (initialStream) {
       setStream(initialStream);
+      setIsLive(initialStream.isLive);
       return;
     }
 
@@ -37,6 +39,7 @@ export default function StreamPage() {
       const foundStream = streams.find((s) => s.id === id);
       if (foundStream) {
         setStream(foundStream);
+        setIsLive(foundStream.isLive);
         clearInterval(interval);
       }
     }, 100);
@@ -58,7 +61,6 @@ export default function StreamPage() {
   React.useEffect(() => {
     if (!stream?.isLive || !liveStreamStore.offer || rtcConnectionRef.current) return;
       
-    // --- Start WebRTC Setup (Viewer side) ---
     const peerConnection = new RTCPeerConnection({
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     });
@@ -66,7 +68,6 @@ export default function StreamPage() {
 
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        // In a real app, send this candidate to the streamer via signaling server
         liveStreamStore.viewerIceCandidates.push(event.candidate);
       }
     };
@@ -74,15 +75,19 @@ export default function StreamPage() {
     peerConnection.ontrack = (event) => {
       if (videoRef.current && videoRef.current.srcObject !== event.streams[0]) {
         videoRef.current.srcObject = event.streams[0];
+        videoRef.current.play().catch(e => console.error("Error playing stream:", e));
       }
     };
 
+    peerConnection.onconnectionstatechange = () => {
+        setIsLive(peerConnection.connectionState === 'connected');
+    }
+
     const setupViewer = async () => {
       try {
-        if (peerConnection.signalingState !== 'closed') {
+        if (peerConnection.signalingState === 'stable') {
           await peerConnection.setRemoteDescription(new RTCSessionDescription(liveStreamStore.offer!));
           
-          // Add streamer ICE candidates that might have been gathered
           liveStreamStore.streamerIceCandidates.forEach(candidate => {
             peerConnection.addIceCandidate(candidate).catch(e => console.error("Error adding ICE candidate: ", e));
           });
@@ -90,7 +95,6 @@ export default function StreamPage() {
           const answer = await peerConnection.createAnswer();
           await peerConnection.setLocalDescription(answer);
 
-          // In a real app, send this answer to the streamer via signaling server
           liveStreamStore.answer = answer;
         }
 
@@ -100,7 +104,6 @@ export default function StreamPage() {
     };
 
     setupViewer();
-    // --- End WebRTC Setup ---
     
     return () => {
         if (rtcConnectionRef.current) {
@@ -128,7 +131,7 @@ export default function StreamPage() {
     <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-6rem)]">
       <div className="flex-1 flex flex-col gap-4">
         <div className="flex-shrink-0">
-          <VideoPlayer ref={videoRef} isLive={stream.isLive} />
+          <VideoPlayer ref={videoRef} isLive={isLive} />
         </div>
         <div className="p-4 bg-card rounded-lg flex-1 flex flex-col">
           <div className="flex items-start justify-between gap-4 mb-4">
