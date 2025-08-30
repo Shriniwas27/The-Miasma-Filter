@@ -62,34 +62,51 @@ export default function GoLivePage() {
         }
       };
       
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-
-      // In a real app, send this offer to the viewer via signaling server
-      liveStreamStore.offer = offer;
-
-      // Poll for the answer from the viewer (simulation)
-      const interval = setInterval(async () => {
-        if (liveStreamStore.answer) {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(liveStreamStore.answer));
-          clearInterval(interval);
-          
-          // Add viewer ICE candidates
-          liveStreamStore.viewerIceCandidates.forEach(candidate => {
-            peerConnection.addIceCandidate(candidate);
-          });
+      peerConnection.onconnectionstatechange = () => {
+        if (peerConnection.connectionState === 'connected') {
+            setIsStreaming(true);
         }
-      }, 1000);
-      // --- End WebRTC Setup ---
+        if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
+            setIsStreaming(false);
+        }
+      }
 
-      setIsStreaming(true);
+      // We need to wait for ICE candidates to be gathered before creating the offer
+      // For simplicity, we'll use a small timeout here. In a real app, you'd use
+      // the 'icegatheringstatechange' event.
+      setTimeout(async () => {
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
 
-      const newStream = await createStreamAction({ title, description, category });
-      toast({
-        title: 'You are live!',
-        description: 'Your stream has started and is now visible to others.',
-      });
-      router.push(`/stream/${newStream.id}`);
+        // In a real app, send this offer to the viewer via signaling server
+        liveStreamStore.offer = offer;
+
+        const newStream = await createStreamAction({ title, description, category });
+
+        // Poll for the answer from the viewer (simulation)
+        const interval = setInterval(async () => {
+          if (liveStreamStore.answer) {
+            if (peerConnection.signalingState !== 'closed' && peerConnection.currentRemoteDescription === null) {
+              await peerConnection.setRemoteDescription(new RTCSessionDescription(liveStreamStore.answer));
+            }
+            clearInterval(interval);
+            
+            // Add viewer ICE candidates
+            liveStreamStore.viewerIceCandidates.forEach(candidate => {
+              if (peerConnection.signalingState !== 'closed') {
+                peerConnection.addIceCandidate(candidate);
+              }
+            });
+          }
+        }, 1000);
+
+        toast({
+          title: 'You are live!',
+          description: 'Your stream has started and is now visible to others.',
+        });
+        router.push(`/stream/${newStream.id}`);
+
+      }, 200); // Wait 200ms for ICE candidates to gather
 
     } catch (error) {
       console.error('Error starting stream:', error);
