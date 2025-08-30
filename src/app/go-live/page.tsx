@@ -26,6 +26,39 @@ export default function GoLivePage() {
   const rtcConnectionRef = React.useRef<RTCPeerConnection | null>(null);
 
   const { toast } = useToast();
+  
+  React.useEffect(() => {
+    const getCameraPermission = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        setHasCameraPermission(true);
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        // Store stream for WebRTC
+        liveStreamStore.stream = stream;
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+        setHasCameraPermission(false);
+        toast({
+          variant: 'destructive',
+          title: 'Camera Access Denied',
+          description: 'Please enable camera and microphone permissions in your browser settings.',
+        });
+      }
+    };
+
+    getCameraPermission();
+
+    return () => {
+        // Clean up stream when component unmounts
+        if (liveStreamStore.stream) {
+            liveStreamStore.stream.getTracks().forEach(track => track.stop());
+            liveStreamStore.stream = null;
+        }
+    }
+  }, [toast]);
+
 
   const handleCopyUrl = () => {
     navigator.clipboard.writeText(streamUrl);
@@ -47,19 +80,22 @@ export default function GoLivePage() {
         return;
     }
     
+    if (!liveStreamStore.stream) {
+        toast({
+            variant: 'destructive',
+            title: 'Camera Not Ready',
+            description: 'Could not access your camera. Please ensure permissions are granted.',
+        });
+        return;
+    }
+    
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setHasCameraPermission(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      
       const peerConnection = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
       });
       rtcConnectionRef.current = peerConnection;
 
-      stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+      liveStreamStore.stream.getTracks().forEach(track => peerConnection.addTrack(track, liveStreamStore.stream!));
 
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
@@ -85,6 +121,7 @@ export default function GoLivePage() {
       const newUrl = `${window.location.origin}/stream/${newStream.id}`;
       setStreamUrl(newUrl);
 
+      // This interval is a stand-in for a real signaling server
       const interval = setInterval(async () => {
         if (liveStreamStore.answer && peerConnection.signalingState !== 'closed' && peerConnection.currentRemoteDescription === null) {
           await peerConnection.setRemoteDescription(new RTCSessionDescription(liveStreamStore.answer));
@@ -106,11 +143,11 @@ export default function GoLivePage() {
 
     } catch (error) {
       console.error('Error starting stream:', error);
-      setHasCameraPermission(false);
+      setIsStreaming(false);
       toast({
         variant: 'destructive',
-        title: 'Camera Access Denied',
-        description: 'Please enable camera and microphone permissions in your browser settings.',
+        title: 'Streaming Error',
+        description: 'An unexpected error occurred while trying to start the stream.',
       });
     }
   };
@@ -157,7 +194,7 @@ export default function GoLivePage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="w-full" size="lg" disabled={isStreaming}>
+              <Button type="submit" className="w-full" size="lg" disabled={isStreaming || hasCameraPermission === false}>
                 <Clapperboard className="mr-2 h-5 w-5" />
                 {isStreaming ? 'Streaming...' : 'Start Streaming'}
               </Button>
@@ -172,7 +209,7 @@ export default function GoLivePage() {
               <Alert variant="destructive">
                 <AlertTitle>Camera Access Required</AlertTitle>
                 <AlertDescription>
-                  Please allow camera and audio access to start streaming.
+                  Please allow camera and audio access to start streaming. Refresh the page after granting permissions.
                 </AlertDescription>
               </Alert>
             )}
