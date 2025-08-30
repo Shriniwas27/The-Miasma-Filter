@@ -12,9 +12,17 @@ import { Eye } from 'lucide-react';
 export default function StreamPage() {
   const params = useParams();
   const id = params.id as string;
-  const [stream, setStream] = React.useState<typeof streams[0] | undefined>(undefined);
+  const [stream, setStream] = React.useState<(typeof streams)[0] | undefined>(undefined);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const rtcConnectionRef = React.useRef<RTCPeerConnection | null>(null);
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+    return () => {
+      setIsMounted(false);
+    }
+  }, []);
 
   React.useEffect(() => {
     // Attempt to find the stream immediately
@@ -36,12 +44,8 @@ export default function StreamPage() {
     // If stream is not found after a few seconds, give up.
     const timeout = setTimeout(() => {
       clearInterval(interval);
-      if (!streams.find((s) => s.id === id)) {
-          // notFound() can't be called in a useEffect cleanup on unmount
-          // but we can ensure it is only called when component is mounted
-          if (videoRef.current) {
-            notFound();
-          }
+      if (isMounted && !streams.find((s) => s.id === id)) {
+        notFound();
       }
     }, 5000);
 
@@ -49,7 +53,7 @@ export default function StreamPage() {
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [id]);
+  }, [id, isMounted]);
   
   React.useEffect(() => {
     if (!stream?.isLive || !liveStreamStore.offer || rtcConnectionRef.current) return;
@@ -75,18 +79,20 @@ export default function StreamPage() {
 
     const setupViewer = async () => {
       try {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(liveStreamStore.offer!));
-        
-        // Add streamer ICE candidates that might have been gathered
-        liveStreamStore.streamerIceCandidates.forEach(candidate => {
-          peerConnection.addIceCandidate(candidate).catch(e => console.error("Error adding ICE candidate: ", e));
-        });
+        if (peerConnection.signalingState !== 'closed') {
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(liveStreamStore.offer!));
+          
+          // Add streamer ICE candidates that might have been gathered
+          liveStreamStore.streamerIceCandidates.forEach(candidate => {
+            peerConnection.addIceCandidate(candidate).catch(e => console.error("Error adding ICE candidate: ", e));
+          });
 
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
+          const answer = await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
 
-        // In a real app, send this answer to the streamer via signaling server
-        liveStreamStore.answer = answer;
+          // In a real app, send this answer to the streamer via signaling server
+          liveStreamStore.answer = answer;
+        }
 
       } catch (error) {
         console.error("Error setting up viewer connection:", error);
