@@ -10,11 +10,36 @@ import { Textarea } from '@/components/ui/textarea';
 import { VideoPlayer } from '@/components/video-player';
 import { streams } from '@/lib/data';
 import { Clapperboard } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function GoLivePage() {
   const categories = [...new Set(streams.map((s) => s.category))];
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
+  const [isStreaming, setIsStreaming] = React.useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = React.useState<boolean | undefined>(undefined);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const { toast } = useToast();
+
+  const handleStartStreaming = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setHasCameraPermission(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setIsStreaming(true);
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setHasCameraPermission(false);
+      toast({
+        variant: 'destructive',
+        title: 'Camera Access Denied',
+        description: 'Please enable camera and microphone permissions in your browser settings.',
+      });
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -32,17 +57,17 @@ export default function GoLivePage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="title">Stream Title</Label>
-              <Input id="title" placeholder="e.g., My Awesome Live Stream" value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Input id="title" placeholder="e.g., My Awesome Live Stream" value={title} onChange={(e) => setTitle(e.target.value)} disabled={isStreaming} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea id="description" name="description" placeholder="Tell viewers about your stream." value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
+              <Textarea id="description" name="description" placeholder="Tell viewers about your stream." value={description} onChange={(e) => setDescription(e.target.value)} rows={4} disabled={isStreaming} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
-              <Select>
+              <Select disabled={isStreaming}>
                 <SelectTrigger id="category">
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
@@ -57,16 +82,24 @@ export default function GoLivePage() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" size="lg">
+            <Button className="w-full" size="lg" onClick={handleStartStreaming} disabled={isStreaming}>
               <Clapperboard className="mr-2 h-5 w-5" />
-              Start Streaming
+              {isStreaming ? 'Streaming...' : 'Start Streaming'}
             </Button>
           </CardFooter>
         </Card>
 
         <div className="space-y-4">
             <h2 className="text-xl font-semibold">Stream Preview</h2>
-            <VideoPlayer />
+            <VideoPlayer ref={videoRef} isLive={isStreaming} />
+            {hasCameraPermission === false && (
+              <Alert variant="destructive">
+                <AlertTitle>Camera Access Required</AlertTitle>
+                <AlertDescription>
+                  Please allow camera and audio access to start streaming.
+                </AlertDescription>
+              </Alert>
+            )}
         </div>
       </div>
     </div>
