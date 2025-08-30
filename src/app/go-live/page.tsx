@@ -52,7 +52,7 @@ export default function GoLivePage() {
         description: 'Your stream has started and is now visible to others.',
       });
       // We could redirect to the new stream page, but for now let's stay here
-      // router.push(`/stream/${newStream.id}`);
+      router.push(`/stream/${newStream.id}`);
 
     } catch (error) {
       console.error('Error starting stream:', error);
