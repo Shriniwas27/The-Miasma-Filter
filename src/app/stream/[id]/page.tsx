@@ -25,7 +25,20 @@ export default function StreamPage() {
           clearInterval(interval);
         }
       }, 100);
-      return () => clearInterval(interval);
+      
+      const timeout = setTimeout(() => {
+        clearInterval(interval);
+        if (!streams.find((s) => s.id === id)) {
+            // If the stream is still not found after a few seconds, show not found.
+            // This is a fallback to prevent infinite loading.
+            notFound();
+        }
+      }, 5000); // Stop polling after 5 seconds
+
+      return () => {
+        clearInterval(interval)
+        clearTimeout(timeout);
+      };
     }
   }, [id, stream]);
 
