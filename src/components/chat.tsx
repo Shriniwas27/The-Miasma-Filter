@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useRef, useState, useActionState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from './ui/card';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -33,7 +32,7 @@ const initialState = {
 };
 
 export function Chat({ streamId }: { streamId: string }) {
-  const [state, formAction] = useFormState(moderateMessageAction, initialState);
+  const [state, formAction] = useActionState(moderateMessageAction, initialState);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const formRef = useRef<HTMLFormElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
