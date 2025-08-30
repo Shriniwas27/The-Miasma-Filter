@@ -37,7 +37,6 @@ export function Chat({ streamId }: { streamId: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const formRef = useRef<HTMLFormElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
 
   useEffect(() => {
     if (state?.message) {
@@ -50,14 +49,6 @@ export function Chat({ streamId }: { streamId: string }) {
       };
       setMessages((prev) => [...prev, newMessage]);
       formRef.current?.reset();
-      
-      if(state.moderated) {
-        toast({
-            variant: "destructive",
-            title: "Content Moderated",
-            description: "Your message was flagged as inappropriate.",
-        })
-      }
     }
   }, [state]);
 

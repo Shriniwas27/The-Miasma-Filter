@@ -6,7 +6,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Eye, Clapperboard, Star } from 'lucide-react';
 import { StreamCard } from '@/components/stream-card';
 import { streams } from '@/lib/data';
-import { TrendingTopics } from '@/components/trending-topics';
 
 export default function Home() {
   const featuredStream = streams[0];
@@ -41,12 +40,6 @@ export default function Home() {
             </Button>
           </Link>
         </div>
-      </section>
-
-      {/* Trending Topics Section */}
-      <section>
-        <h2 className="text-3xl font-bold tracking-tight mb-4">Trending Topics</h2>
-        <TrendingTopics />
       </section>
 
       {/* Live Now Section */}
