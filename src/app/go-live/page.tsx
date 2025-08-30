@@ -23,6 +23,8 @@ export default function GoLivePage() {
   const [isStreaming, setIsStreaming] = React.useState(false);
   const [hasCameraPermission, setHasCameraPermission] = React.useState<boolean | undefined>(undefined);
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const rtcConnectionRef = React.useRef<RTCPeerConnection | null>(null);
+
   const { toast } = useToast();
   const router = useRouter();
 
@@ -45,8 +47,40 @@ export default function GoLivePage() {
         videoRef.current.srcObject = stream;
       }
       
-      // Store the stream in our "live store" to be picked up by the stream page
-      liveStreamStore.stream = stream;
+      // --- Start WebRTC Setup (Streamer side) ---
+      const peerConnection = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+      rtcConnectionRef.current = peerConnection;
+
+      stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          // In a real app, send this candidate to the viewer via signaling server
+          liveStreamStore.streamerIceCandidates.push(event.candidate);
+        }
+      };
+      
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+
+      // In a real app, send this offer to the viewer via signaling server
+      liveStreamStore.offer = offer;
+
+      // Poll for the answer from the viewer (simulation)
+      const interval = setInterval(async () => {
+        if (liveStreamStore.answer) {
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(liveStreamStore.answer));
+          clearInterval(interval);
+          
+          // Add viewer ICE candidates
+          liveStreamStore.viewerIceCandidates.forEach(candidate => {
+            peerConnection.addIceCandidate(candidate);
+          });
+        }
+      }, 1000);
+      // --- End WebRTC Setup ---
 
       setIsStreaming(true);
 

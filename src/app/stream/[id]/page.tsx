@@ -7,13 +7,14 @@ import { VideoPlayer } from '@/components/video-player';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Chat } from '@/components/chat';
-import { Eye, UserCircle } from 'lucide-react';
+import { Eye } from 'lucide-react';
 
 export default function StreamPage() {
   const params = useParams();
   const id = params.id as string;
-  const [stream, setStream] = React.useState(streams.find((s) => s.id === id));
+  const [stream, setStream] = React.useState(() => streams.find((s) => s.id === id));
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const rtcConnectionRef = React.useRef<RTCPeerConnection | null>(null);
 
   React.useEffect(() => {
     if (!stream) {
@@ -33,19 +34,62 @@ export default function StreamPage() {
       }, 5000);
 
       return () => {
-        clearInterval(interval)
+        clearInterval(interval);
         clearTimeout(timeout);
       };
     }
   }, [id, stream]);
   
   React.useEffect(() => {
-      // In our simulation, we get the live stream from the store.
-      // In a real app, this would connect to a media server.
-    if (videoRef.current && stream?.isLive && liveStreamStore.stream) {
-        videoRef.current.srcObject = liveStreamStore.stream;
+    if (!stream?.isLive || !liveStreamStore.offer) return;
+      
+    // --- Start WebRTC Setup (Viewer side) ---
+    const peerConnection = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+    rtcConnectionRef.current = peerConnection;
+
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        // In a real app, send this candidate to the streamer via signaling server
+        liveStreamStore.viewerIceCandidates.push(event.candidate);
+      }
+    };
+    
+    peerConnection.ontrack = (event) => {
+      if (videoRef.current) {
+        videoRef.current.srcObject = event.streams[0];
+      }
+    };
+
+    const setupViewer = async () => {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(liveStreamStore.offer!));
+      
+      // Add streamer ICE candidates
+      liveStreamStore.streamerIceCandidates.forEach(candidate => {
+        peerConnection.addIceCandidate(candidate);
+      });
+
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+
+      // In a real app, send this answer to the streamer via signaling server
+      liveStreamStore.answer = answer;
+    };
+
+    setupViewer();
+    // --- End WebRTC Setup ---
+    
+    return () => {
+        rtcConnectionRef.current?.close();
+        rtcConnectionRef.current = null;
+        // Clean up signaling store for next stream
+        liveStreamStore.offer = null;
+        liveStreamStore.answer = null;
+        liveStreamStore.streamerIceCandidates = [];
+        liveStreamStore.viewerIceCandidates = [];
     }
-  }, [stream, videoRef]);
+  }, [stream?.isLive]);
 
 
   if (!stream) {
