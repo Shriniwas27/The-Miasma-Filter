@@ -3,11 +3,12 @@
 import { notFound, useParams } from 'next/navigation';
 import * as React from 'react';
 import { streams, liveStreamStore } from '@/lib/data';
-import { VideoPlayer } from '@/components/video-player';
+import StreamPlayer from '@/components/StreamPlayer';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Chat } from '@/components/chat';
 import { Eye } from 'lucide-react';
+import { ContentValidationToast } from '@/components/ContentValidationToast'
 
 export default function StreamPage() {
   const params = useParams();
@@ -127,11 +128,18 @@ export default function StreamPage() {
     );
   }
 
+  const streamKey = "uplglkfqmtl52f0w4lj6";
+  const streamUrl = `/api/stream/playlist/${streamKey}`;
+
   return (
     <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-6rem)]">
       <div className="flex-1 flex flex-col gap-4">
         <div className="flex-shrink-0">
-          <VideoPlayer ref={videoRef} isLive={isLive} />
+          <StreamPlayer 
+              streamUrl={streamUrl} 
+              isLive={true}
+              streamKey={streamKey}
+            />
         </div>
         <div className="p-4 bg-card rounded-lg flex-1 flex flex-col">
           <div className="flex items-start justify-between gap-4 mb-4">
@@ -168,7 +176,8 @@ export default function StreamPage() {
           </div>
         </div>
       </div>
-      <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
+      <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 gap-1">
+        <ContentValidationToast /> 
         <Chat streamId={stream.id} />
       </div>
     </div>
